@@ -5,6 +5,11 @@ from flask_sqlalchemy import SQLAlchemy
 import datetime
 import base64
 
+import tensorflow as tf
+from tensorflow.keras.applications.resnet50 import preprocess_input, decode_predictions
+from tensorflow.keras.preprocessing import image
+import numpy as np
+
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'files/photos/'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///main.db'
@@ -49,6 +54,18 @@ def hello_world():
 @app.route('/home')
 def home():
     photos = Gallery.query.all()
+    model = tf.keras.applications.resnet50.ResNet50()
+    for photo in photos:
+        img_path = os.path.join('files/photos/', photo.filename)
+        img = image.load_img(img_path, target_size=(224, 224))
+        img_array = image.img_to_array(img)
+        img_batch = np.expand_dims(img_array, axis=0)
+        img_preprocessed = preprocess_input(img_batch)
+        prediction = model.predict(img_preprocessed)
+        result = decode_predictions(prediction, top=1)[0][0][1].replace("_", " ")
+        accuracy = decode_predictions(prediction, top=1)[0][0][2]
+        photo.description = result + " ("+str(accuracy)+"%)"
+
     # print(jsonify(
     #     [{'id': photo.id, 'filename': photo.filename, 'img_url': photo.img_url, 'created_at': photo.created_at} for
     #      photo in photos]))
@@ -103,4 +120,4 @@ def download_file(filename):
 
 
 if __name__ == '__main__':
-    app.run()
+    app.run(host="192.168.1.13", debug=True)
