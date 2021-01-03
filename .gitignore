@@ -1,0 +1,4 @@
+files/
+venv/
+*.db
+.idea
