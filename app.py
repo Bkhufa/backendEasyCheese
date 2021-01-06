@@ -26,6 +26,7 @@ class Gallery(db.Model):
     description = db.Column(db.String, nullable=True)
     img_url = db.Column(db.String, nullable=False)
     created_at = db.Column(db.DATETIME, nullable=True)
+    map_data = db.Column(db.String, nullable=True)  # Serialized from "latitude:xx,longitude:yy"
     sensors = db.relationship('Sensor', backref=db.backref('gallery', lazy='joined'), lazy=True)
 
     def __repr__(self):
@@ -48,12 +49,6 @@ class Sensor(db.Model):
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-
-@app.route('/')
-def hello_world():
-    return 'Hello World!'
-
-
 @app.route('/home')
 def home():
     photos = Gallery.query.all()
@@ -73,7 +68,7 @@ def home():
     #     [{'id': photo.id, 'filename': photo.filename, 'img_url': photo.img_url, 'created_at': photo.created_at} for
     #      photo in photos]))
     return jsonify([{'id': photo.id, 'description': photo.description, 'filename': photo.filename,
-                     'img_url': photo.img_url, 'created_at': photo.created_at} for
+                     'img_url': photo.img_url, 'created_at': photo.created_at, 'map_data': photo.map_data} for
                     photo in photos])
 
 
