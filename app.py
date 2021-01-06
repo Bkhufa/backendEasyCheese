@@ -9,6 +9,9 @@ import tensorflow as tf
 from tensorflow.keras.applications.resnet50 import preprocess_input, decode_predictions
 from tensorflow.keras.preprocessing import image
 import numpy as np
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'files/photos/'
@@ -64,7 +67,7 @@ def home():
         prediction = model.predict(img_preprocessed)
         result = decode_predictions(prediction, top=1)[0][0][1].replace("_", " ")
         accuracy = decode_predictions(prediction, top=1)[0][0][2]
-        photo.description = result + " ("+str(accuracy)+"%)"
+        photo.description = result + " (" + str(accuracy) + "%)"
 
     # print(jsonify(
     #     [{'id': photo.id, 'filename': photo.filename, 'img_url': photo.img_url, 'created_at': photo.created_at} for
@@ -80,7 +83,7 @@ def get_sensor(gallery_id):
     sensor = gallery.sensors[0]
 
     if sensor is not None:
-        return jsonify({"id": sensor.id, "type": sensor.type, "gallery_id":sensor.gallery_id, "data": sensor.data})
+        return jsonify({"id": sensor.id, "type": sensor.type, "gallery_id": sensor.gallery_id, "data": sensor.data})
 
 
 @app.route('/upload', methods=['POST'])
@@ -120,4 +123,4 @@ def download_file(filename):
 
 
 if __name__ == '__main__':
-    app.run(host="192.168.1.13", debug=True)
+    app.run(host=os.getenv('HOSTNAME'), debug=True)

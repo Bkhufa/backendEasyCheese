@@ -2,3 +2,4 @@ files/
 venv/
 *.db
 .idea
+.env
