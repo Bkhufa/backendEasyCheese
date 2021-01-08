@@ -11,6 +11,11 @@ from tensorflow.keras.preprocessing import image
 import numpy as np
 from dotenv import load_dotenv
 
+from imageai.Detection import ObjectDetection
+from keras import backend as K
+import time
+from PIL import Image
+
 load_dotenv()
 
 app = Flask(__name__)
@@ -18,7 +23,6 @@ app.config['UPLOAD_FOLDER'] = 'files/photos/'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///main.db'
 ALLOWED_EXTENSIONS = {'png', 'jpeg', 'jpg'}
 db = SQLAlchemy(app)
-
 
 class Gallery(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -52,17 +56,19 @@ def allowed_file(filename):
 @app.route('/home')
 def home():
     photos = Gallery.query.all()
-    model = tf.keras.applications.resnet50.ResNet50()
-    for photo in photos:
-        img_path = os.path.join('files/photos/', photo.filename)
-        img = image.load_img(img_path, target_size=(224, 224))
-        img_array = image.img_to_array(img)
-        img_batch = np.expand_dims(img_array, axis=0)
-        img_preprocessed = preprocess_input(img_batch)
-        prediction = model.predict(img_preprocessed)
-        result = decode_predictions(prediction, top=1)[0][0][1].replace("_", " ")
-        accuracy = decode_predictions(prediction, top=1)[0][0][2]
-        photo.description = result + " (" + str(accuracy) + "%)"
+    # model = tf.keras.applications.resnet50.ResNet50()
+    # for photo in photos:
+    #     img_path = os.path.join('files/photos/', photo.filename)
+    #     # detections = yolo_obj.detectObjectsFromImage(input_image = img_path, output_image_path = img_path)
+    #
+    #     img = image.load_img(img_path, target_size=(224, 224))
+    #     img_array = image.img_to_array(img)
+    #     img_batch = np.expand_dims(img_array, axis=0)
+    #     img_preprocessed = preprocess_input(img_batch)
+    #     prediction = model.predict(img_preprocessed)
+    #     result = decode_predictions(prediction, top=1)[0][0][1].replace("_", " ")
+    #     accuracy = decode_predictions(prediction, top=1)[0][0][2]
+    #     photo.description = result + " (" + str(accuracy) + "%)"
 
     # print(jsonify(
     #     [{'id': photo.id, 'filename': photo.filename, 'img_url': photo.img_url, 'created_at': photo.created_at} for
@@ -89,17 +95,33 @@ def upload_image():
         sensor_data = str(request.form['sensor'])
         filename = secure_filename(request.form['filename'])
         fpath = os.path.join('files/photos/', filename)
+        fpath_dummy = os.path.join('files/photos_dummy/', filename)
         file = base64.b64decode(request.form['raw'])
-        with open(fpath, 'wb') as fout:
+        with open(fpath_dummy, 'wb') as fout:
             fout.write(file)
 
-        photo = Gallery(filename=filename, description="Test",
+        K.clear_session()
+        yolo_obj = ObjectDetection()
+        yolo_obj.setModelTypeAsYOLOv3()
+        exec_path = os.getcwd()
+        yolo_obj.setModelPath(os.path.join(exec_path, "yolo.h5"))
+        yolo_obj.loadModel()
+        detections = yolo_obj.detectObjectsFromImage(input_image=fpath_dummy, output_image_path=fpath)
+        results = []
+        for objects in detections:
+            result = objects["name"] + " : " + str(objects["percentage_probability"])
+            results.append(result)
+            print(objects["name"], " : ", objects["percentage_probability"])
+        K.clear_session()
+        list_result = '. '.join(map(str, results))
+        photo = Gallery(filename=filename, description=list_result,
                         img_url=fpath, created_at=datetime.datetime.now())
         db.session.add(photo)
         db.session.commit()
         sensor = Sensor(gallery_id=photo.id, type='accelerometer', data=sensor_data)
         db.session.add(sensor)
         db.session.commit()
+
         # f.save(fpath)
         return jsonify({
             'id': photo.id,
@@ -115,7 +137,6 @@ def upload_image():
 def download_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'],
                                filename, as_attachment=True)
-
 
 if __name__ == '__main__':
     app.run(host=os.getenv('HOSTNAME'), debug=True)
