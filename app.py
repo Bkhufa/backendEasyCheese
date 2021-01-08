@@ -86,6 +86,22 @@ def get_sensor(gallery_id):
     if sensor is not None:
         return jsonify({"id": sensor.id, "type": sensor.type, "gallery_id": sensor.gallery_id, "data": sensor.data})
 
+def predict(fpath):
+    K.clear_session()
+    yolo_obj = ObjectDetection()
+    yolo_obj.setModelTypeAsYOLOv3()
+    exec_path = os.getcwd()
+    yolo_obj.setModelPath(os.path.join(exec_path, "yolo.h5"))
+    yolo_obj.loadModel()
+    detections = yolo_obj.detectObjectsFromImage(input_image=fpath, output_image_path=fpath)
+    results = []
+    for objects in detections:
+        result = objects["name"] + " : " + str(objects["percentage_probability"])
+        results.append(result)
+        print(objects["name"], " : ", objects["percentage_probability"])
+    K.clear_session()
+    list_result = '. '.join(map(str, results))
+    return list_result
 
 @app.route('/upload', methods=['POST'])
 def upload_image():
@@ -95,25 +111,13 @@ def upload_image():
         sensor_data = str(request.form['sensor'])
         filename = secure_filename(request.form['filename'])
         fpath = os.path.join('files/photos/', filename)
-        fpath_dummy = os.path.join('files/photos_dummy/', filename)
+        # fpath_dummy = os.path.join('files/photos_dummy/', filename)
         file = base64.b64decode(request.form['raw'])
-        with open(fpath_dummy, 'wb') as fout:
+        with open(fpath, 'wb') as fout:
             fout.write(file)
 
-        K.clear_session()
-        yolo_obj = ObjectDetection()
-        yolo_obj.setModelTypeAsYOLOv3()
-        exec_path = os.getcwd()
-        yolo_obj.setModelPath(os.path.join(exec_path, "yolo.h5"))
-        yolo_obj.loadModel()
-        detections = yolo_obj.detectObjectsFromImage(input_image=fpath_dummy, output_image_path=fpath)
-        results = []
-        for objects in detections:
-            result = objects["name"] + " : " + str(objects["percentage_probability"])
-            results.append(result)
-            print(objects["name"], " : ", objects["percentage_probability"])
-        K.clear_session()
-        list_result = '. '.join(map(str, results))
+        list_result = predict(fpath)
+
         photo = Gallery(filename=filename, description=list_result,
                         img_url=fpath, created_at=datetime.datetime.now())
         db.session.add(photo)
