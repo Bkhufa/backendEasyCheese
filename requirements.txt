@@ -3,5 +3,4 @@ flask>=1.1.2
 werkzeug>=1.0.1
 python-dotenv>=0.15.0
 keras>=2.4.3
-python-dotenv
 imageai

@@ -11,6 +11,8 @@ from dotenv import load_dotenv
 from imageai.Detection import ObjectDetection
 from keras import backend as K
 
+import cv2
+
 load_dotenv()
 tf.config.set_visible_devices([], 'GPU')
 
@@ -40,8 +42,10 @@ class Gallery(db.Model):
     description = db.Column(db.String, nullable=True)
     img_url = db.Column(db.String, nullable=False)
     created_at = db.Column(db.DATETIME, nullable=True)
-    map_data = db.Column(db.String, nullable=True)  # Serialized from "latitude:xx,longitude:yy"
-    sensors = db.relationship('Sensor', backref=db.backref('gallery', lazy='joined'), lazy=True)
+    # Serialized from "latitude:xx,longitude:yy"
+    map_data = db.Column(db.String, nullable=True)
+    sensors = db.relationship('Sensor', backref=db.backref(
+        'gallery', lazy='joined'), lazy=True)
 
     def __repr__(self):
         return '<Gallery %r>' % self.filename
@@ -52,7 +56,8 @@ class Gallery(db.Model):
 
 class Sensor(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    gallery_id = db.Column(db.Integer, db.ForeignKey('gallery.id'), nullable=False)
+    gallery_id = db.Column(db.Integer, db.ForeignKey(
+        'gallery.id'), nullable=False)
     type = db.Column(db.String, nullable=False)
     data = db.Column(db.String, nullable=False)
 
@@ -81,6 +86,12 @@ def get_sensor(gallery_id):
         return jsonify({"id": sensor.id, "type": sensor.type, "gallery_id": sensor.gallery_id, "data": sensor.data})
 
 
+def rotate(fpath):
+    image = cv2.imread(fpath)
+    rotated = cv2.rotate(image, cv2.cv2.ROTATE_90_CLOCKWISE)
+    cv2.imwrite(fpath, rotated)
+
+
 def predict(fpath):
     K.clear_session()
     yolo_obj = ObjectDetection()
@@ -88,10 +99,12 @@ def predict(fpath):
     exec_path = os.getcwd()
     yolo_obj.setModelPath(os.path.join(exec_path, "yolo.h5"))
     yolo_obj.loadModel()
-    detections = yolo_obj.detectObjectsFromImage(input_image=fpath, output_image_path=fpath)
+    detections = yolo_obj.detectObjectsFromImage(
+        input_image=fpath, output_image_path=fpath)
     results = []
     for objects in detections:
-        result = objects["name"] + " : " + str(objects["percentage_probability"])
+        result = objects["name"] + " : " + \
+            str(objects["percentage_probability"])
         results.append(result)
         print(objects["name"], " : ", objects["percentage_probability"])
     K.clear_session()
@@ -113,13 +126,16 @@ def upload_image():
         with open(fpath, 'wb') as fout:
             fout.write(file)
 
+
+        rotate(fpath)
         list_result = predict(fpath)
 
         photo = Gallery(filename=filename, description=list_result,
                         img_url=fpath, created_at=datetime.datetime.now(), map_data=map_data)
         db.session.add(photo)
         db.session.commit()
-        sensor = Sensor(gallery_id=photo.id, type='accelerometer', data=sensor_data)
+        sensor = Sensor(gallery_id=photo.id,
+                        type='accelerometer', data=sensor_data)
         db.session.add(sensor)
         db.session.commit()
 
@@ -141,4 +157,5 @@ def download_file(filename):
 
 
 if __name__ == '__main__':
-    app.run(host=os.getenv('HOSTNAME'), debug=True)
+    # app.run(host=os.getenv('HOSTNAME'), debug=True)
+    app.run("192.168.8.101", debug=True)
