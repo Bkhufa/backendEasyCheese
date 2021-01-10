@@ -86,6 +86,22 @@ def get_sensor(gallery_id):
         return jsonify({"id": sensor.id, "type": sensor.type, "gallery_id": sensor.gallery_id, "data": sensor.data})
 
 
+@app.route("/delete/<int:gallery_id>", methods=['DELETE'])
+def delete_item(gallery_id):
+    # TODO: DELETE FILE
+    item = Gallery.query.filter_by(id=gallery_id).first()
+    sensor = Sensor.query.filter_by(gallery_id=gallery_id).first()
+    try:
+        # os.remove(item.img_url)
+        db.session.delete(sensor)
+        db.session.delete(item)
+        db.session.commit()
+        return jsonify({'success': True})
+    except:
+        print("Delete {} failed".format(item.filename))
+    return jsonify({'success': False})
+
+
 def rotate(fpath):
     image = cv2.imread(fpath)
     rotated = cv2.rotate(image, cv2.cv2.ROTATE_90_CLOCKWISE)
@@ -104,7 +120,7 @@ def predict(fpath):
     results = []
     for objects in detections:
         result = objects["name"] + " : " + \
-            str(objects["percentage_probability"])
+                 str(objects["percentage_probability"])
         results.append(result)
         print(objects["name"], " : ", objects["percentage_probability"])
     K.clear_session()
@@ -125,7 +141,6 @@ def upload_image():
         file = base64.b64decode(request.form['raw'])
         with open(fpath, 'wb') as fout:
             fout.write(file)
-
 
         rotate(fpath)
         list_result = predict(fpath)
@@ -157,5 +172,5 @@ def download_file(filename):
 
 
 if __name__ == '__main__':
-    # app.run(host=os.getenv('HOSTNAME'), debug=True)
-    app.run("192.168.8.101", debug=True)
+    app.run(host=os.getenv('HOSTNAME'), debug=True)
+    # app.run("192.168.8.101", debug=True)
