@@ -6,23 +6,33 @@ import datetime
 import base64
 
 import tensorflow as tf
-from tensorflow.keras.applications.resnet50 import preprocess_input, decode_predictions
-from tensorflow.keras.preprocessing import image
-import numpy as np
 from dotenv import load_dotenv
 
 from imageai.Detection import ObjectDetection
 from keras import backend as K
-import time
-from PIL import Image
 
 load_dotenv()
+tf.config.set_visible_devices([], 'GPU')
+
+# os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
+# gpus = tf.config.experimental.list_physical_devices('GPU')
+# if gpus:
+#     try:
+#         # Currently, memory growth needs to be the same across GPUs
+#         for gpu in gpus:
+#             tf.config.experimental.set_memory_growth(gpu, True)
+#         logical_gpus = tf.config.experimental.list_logical_devices('GPU')
+#         print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
+#     except RuntimeError as e:
+#         # Memory growth must be set before GPUs have been initialized
+#         print(e)
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'files/photos/'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///main.db'
 ALLOWED_EXTENSIONS = {'png', 'jpeg', 'jpg'}
 db = SQLAlchemy(app)
+
 
 class Gallery(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -47,32 +57,16 @@ class Sensor(db.Model):
     data = db.Column(db.String, nullable=False)
 
     def __repr__(self):
-        return self.id
+        return self.data
 
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+
 @app.route('/home')
 def home():
     photos = Gallery.query.all()
-    # model = tf.keras.applications.resnet50.ResNet50()
-    # for photo in photos:
-    #     img_path = os.path.join('files/photos/', photo.filename)
-    #     # detections = yolo_obj.detectObjectsFromImage(input_image = img_path, output_image_path = img_path)
-    #
-    #     img = image.load_img(img_path, target_size=(224, 224))
-    #     img_array = image.img_to_array(img)
-    #     img_batch = np.expand_dims(img_array, axis=0)
-    #     img_preprocessed = preprocess_input(img_batch)
-    #     prediction = model.predict(img_preprocessed)
-    #     result = decode_predictions(prediction, top=1)[0][0][1].replace("_", " ")
-    #     accuracy = decode_predictions(prediction, top=1)[0][0][2]
-    #     photo.description = result + " (" + str(accuracy) + "%)"
-
-    # print(jsonify(
-    #     [{'id': photo.id, 'filename': photo.filename, 'img_url': photo.img_url, 'created_at': photo.created_at} for
-    #      photo in photos]))
     return jsonify([{'id': photo.id, 'description': photo.description, 'filename': photo.filename,
                      'img_url': photo.img_url, 'created_at': photo.created_at, 'map_data': photo.map_data} for
                     photo in photos])
@@ -85,6 +79,7 @@ def get_sensor(gallery_id):
 
     if sensor is not None:
         return jsonify({"id": sensor.id, "type": sensor.type, "gallery_id": sensor.gallery_id, "data": sensor.data})
+
 
 def predict(fpath):
     K.clear_session()
@@ -103,6 +98,7 @@ def predict(fpath):
     list_result = '. '.join(map(str, results))
     return list_result
 
+
 @app.route('/upload', methods=['POST'])
 def upload_image():
     print(request.form['filename'])
@@ -111,6 +107,7 @@ def upload_image():
         sensor_data = str(request.form['sensor'])
         filename = secure_filename(request.form['filename'])
         fpath = os.path.join('files/photos/', filename)
+        map_data = str(request.form['mapData'])
         # fpath_dummy = os.path.join('files/photos_dummy/', filename)
         file = base64.b64decode(request.form['raw'])
         with open(fpath, 'wb') as fout:
@@ -119,7 +116,7 @@ def upload_image():
         list_result = predict(fpath)
 
         photo = Gallery(filename=filename, description=list_result,
-                        img_url=fpath, created_at=datetime.datetime.now())
+                        img_url=fpath, created_at=datetime.datetime.now(), map_data=map_data)
         db.session.add(photo)
         db.session.commit()
         sensor = Sensor(gallery_id=photo.id, type='accelerometer', data=sensor_data)
@@ -141,6 +138,7 @@ def upload_image():
 def download_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'],
                                filename, as_attachment=True)
+
 
 if __name__ == '__main__':
     app.run(host=os.getenv('HOSTNAME'), debug=True)
