@@ -121,9 +121,9 @@ def predict(fpath):
     results = []
     for objects in detections:
         result = objects["name"] + " : " + \
-                 str(int(objects["percentage_probability"]))
+                 str(round(objects["percentage_probability"], 2))
         results.append(result)
-        print(objects["name"], " : ", objects["percentage_probability"])
+        print(objects["name"], " : ", round(objects["percentage_probability"], 2))
     K.clear_session()
     list_result = '. '.join(map(str, results))
     return list_result
