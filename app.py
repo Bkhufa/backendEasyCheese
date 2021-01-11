@@ -4,6 +4,7 @@ import os
 from flask_sqlalchemy import SQLAlchemy
 import datetime
 import base64
+import operator
 
 import tensorflow as tf
 from dotenv import load_dotenv
@@ -120,7 +121,7 @@ def predict(fpath):
     results = []
     for objects in detections:
         result = objects["name"] + " : " + \
-                 str(objects["percentage_probability"])
+                 str(int(objects["percentage_probability"]))
         results.append(result)
         print(objects["name"], " : ", objects["percentage_probability"])
     K.clear_session()
